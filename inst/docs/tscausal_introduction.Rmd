@@ -1,0 +1,186 @@
+---
+title: "**tscausal**: time series causal inference"
+output: 
+  bookdown::pdf_document2: 
+    citation_package: natbib
+    fig_caption: yes
+    keep_tex: yes
+    toc: no
+    toc_depth: 4
+header-includes:
+- \usepackage{lscape}
+- \usepackage{fancyhdr}
+- \usepackage{multirow}
+- \usepackage{ctable}
+- \pagestyle{fancy}
+- \fancyfoot[RO,RE]{2020-11-30}
+- \fancyhead[L]{\nouppercase{\leftmark}}
+- \fancyfoot[L]{\thepage}
+bibliography: causal.bib
+---
+
+```{r,echo=FALSE}
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+options(width = 200)
+```
+
+## Motivation{-}
+
+The objective of the _tscausal_ package is to provide an easy to use framework to evaluate any time series based forecast distribution, proxying for the counterfactual distribution, and generate an automatic set of diagnostics on the significance of an intervention. It is heavily influenced by the CausalImpact package described in \cite{brodersen2015}, and from which it borrows parts of the diagnostics and output narrative.
+
+Unlike _CausalImpact_, the package is agnostic to any particular time series model, but it does require that the forecast distribution conform to certain requirements, namely that it inherits class "tsmodel.distribution". Any matrix of size $N\times h$, representing the N simulated points for each forecast period $t\in h$, where $t>T$ (the intervention date), can be coerced to this class. It is assumed that the user can and has trained a model on the pre-intervention period and our code repository provides for a wide array of models, with common calling conventions and the ability to generate frequentist simulated or Bayesian predictive distributions, all of which inherit class "tsmodel.distribution".
+
+In the absence of very good controls (external regressors), most of the time series models we use are founded on autoregressive type building blocks for the motion dynamics which impart the typical widening of the prediction intervals as the forecast horizon grows, commensurate with future uncertainty.
+
+## Evaluation of Significance{-}
+
+### Pointwise Impact{-}
+
+Given an intervention date $T$, and a post-intervention period under consideration $T+1,\ldots,T+h$, then the causal pointwise effect $\phi^{(s)}_{t \forall t \in T+1,\ldots,T+h}$ given a draw $s$ from the predictive distribution is:
+
+$$
+\phi^{(s)}_t = y_t - \hat y^{(s)}_t
+$$
+
+where $y$ represents the outcome variable and $\hat y$ the forecasted (or counterfactual) variable. Because we have a distributional forecast, representing the uncertainty about the forecasted variable $\hat y$ at each date in the horizon $T+1,\ldots,T+h$, and indexed by draws $(s)_1,\ldots,(s)_N$, we can generate an empirical distribution of any function applied to the distribution (e.g. summation, differences etc). Given a significance level $a$\%, then the $100-a$\% confidence interval can be evaluated by making use of the empirical quantile function from this distribution\footnote{Where the empirical quantile is defined as :
+$$
+F_n^{ - 1}\left( p \right) = \inf \left\{ {x:{F_n}\left( x \right) \geqslant p} \right\} = {X_{n(i)}}
+$$
+where i is chosen such that $\frac{{i - 1}}{n} < p \leqslant \frac{i}{n}$ and $X_{n(i)},\ldots,X_{n(n)}$ are the order statistics of the sample i.e. such that ${X_{n(1)}} \leqslant \ldots \leqslant {X_{n(n)}}$ and $\left( {{X_{n(1)}},\ldots,{X_{n(n)}}} \right)$ is a permutation of the sample $\left(X_1,\ldots,X_n\right)$.}
+
+
+### Cumulative Impact{-}
+
+The cumulative impact is derived from the pointwise impact as :
+
+$$
+\Phi _t^{(s)} = \sum\limits_{i = T + 1}^t {\phi _i^{(s)}}
+$$
+
+which is a useful quantity when the outcome represents a flow variable (e.g. revenue, signups), measured over an interval of time, and not interpretable when it represents a stock variable (e.g. inventory, subscribers).
+
+### Mean Effect{-}
+
+Given an intervention date $T$, and a post-intervention period $T+1,\ldots,T+h$, then the average effect given a draw $s$ from the predictive distribution is:
+
+
+$$
+{\alpha ^{(s)}} = \frac{1}{{t - T}}\sum\limits_{i = T + 1}^{T + h} {{{y_i} - \hat y_i^{(s)}} }
+$$
+
+
+
+### Mean Relative Effect{-}
+
+A related measure, showing the relative effect of the intervention can be defined :
+
+$$
+{r^{(s)}} = \frac{{{\alpha ^{(s)}}}}{{{\mu _{\hat y}}}}
+$$
+where $\mu_{\bar y}$ is the mean of the forecasted variable $\forall t>T$ and $\forall s$.
+
+
+## Evaluation of Significance{-}
+
+Given a signficance level $a$, then under the null hypothesis that the intervention was not significant, we fail to reject if $F^{-1}_n\left(\alpha/2\right)<0$ && $F^{-1}_n\left(1-\alpha/2\right)>0$, and reject otherwise. For instance, if the effect was positive with a lower quantile value above zero then we would reject the null and conclude that the effect was positive and significant. If the effect was negative with an upper quantile value less than zero we would also reject the null and conclude that the effect was negative and significant.
+
+Another statistic which can be used to evaluate whether the results could have occurred by chance is given by the following:
+
+$$
+\frac{1}{N}\sum\limits_{j = 1}^N {\left[ {\left( {\sum\limits_{i = T + 1}^{T + h} {\phi _t^{(j)}} } \right) \geqslant 0} \right]}
+$$
+
+which measures the percent of times the total net effect for the entire forecast horizon and across all draws of the distribution was positive.\footnote{For negative net effects, reverse the direction of the inequality, or to capture all cases use:
+
+$$
+\min \left\{ {\frac{1}{N}\sum\limits_{j = 1}^N {\left[ {\left( {\sum\limits_{i = T + 1}^{T + h} {\phi _t^{(j)}} } \right) \geqslant 0} \right]} ,\frac{1}{N}\sum\limits_{j = 1}^N {\left[ {\left( {\sum\limits_{i = T + 1}^{T + h} {\phi _t^{(j)}} } \right) \leqslant 0} \right]} } \right\}
+$$
+}
+
+## Package Features{-}
+
+The package has one main method called **tscausal** which takes as arguments a *tsmodel.distribution* object, the outcome variable (as xts object which includes both the pre and post intervention data), an optional xts vector (or *tsmodel.distribution*) of the in-sample fitted values and the significance level for hypothesis testing **alpha**, as shown below:
+
+```{r,highlight=TRUE,echo=FALSE,warning=FALSE}
+suppressMessages(library(tscausal))
+suppressMessages(library(knitr))
+suppressMessages(library(tsets))
+suppressMessages(library(tsaux))
+suppressMessages(library(rmarkdown))
+suppressMessages(library(xts))
+args(tscausal:::tscausal.tsmodel.distribution)
+```
+
+Additionally, once the causal object has been created, there are methods for plotting (*plot*), printing of results (*print*) as well as a reporting (*tsreport*) which can be used to automatically generate a pdf, doc or html report with full evaluation and graphics. The next section provides a demonstration.
+
+## Package Demo{-}
+
+We use the priceunits dataset, and in particular the units series, and add an artificial structural break during 1999-03 which could represent for instance a large drop in prices, some large substitution effect or a succesful marketing campaign.
+
+
+```{r,highlight=TRUE,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+data(priceunits, package = "tsdatasets")
+priceunits <- priceunits[,2]
+priceunits["1999-03/"] <- priceunits["1999-03/"] + 10
+train <- "/1999-02"
+test = "1999-03/1999-08"
+y_train = priceunits[train]
+y_test  = priceunits[test]
+spec <- ets_modelspec(y_train, frequency = 12, lambda = 0, model = "AAN")
+mod <- estimate(spec)
+```
+
+
+```{r,highlight=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+summary(mod)
+```
+
+```{r,highlight=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+prediction <- predict(mod, h = nrow(y_test), nsim = 5000)
+```
+
+Note that the prediction object has a number of slots, one of which is called **distribution** and inherits the following classes : `r class(prediction$distribution)`. All our packages have a predictable and common set of slots in the returned prediction objects.
+
+The final step is to pass the forecast distribution to the **tscausal** method and generate a report with a narrative explaining the results
+and a decision on whether to reject or not the null of no intervention effect.
+
+\clearpage
+
+```{r,highlight=TRUE,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+cause <- tscausal(prediction$distribution, actual = rbind(y_train, y_test), 
+                  fitted = fitted(mod))
+print(cause)
+```
+
+```{r,echo=TRUE,eval=FALSE}
+tsreport(cause)
+```
+
+
+```{r,echo=FALSE,highlight=TRUE,tidy=TRUE, tidy.opts=list(width.cutoff=60),results='asis'}
+tscausal:::.latex.output(cause)
+```
+
+
+The *tsreport* method has options for printing to screen or generating a pdf, html or docx (with option to use a template as well). Example usage is provided below:
+
+```{r, highlight=TRUE,eval = FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+tsreport(cause, type = "pdf", output_dir = "~/tmp", 
+         args = list(model = "ETS[AAN]", frequency = 12, name = "Units"))
+tsreport(cause, type = "html", output_dir = "~/tmp", 
+         args = list(model = "ETS[AAN]", frequency = 12, name = "Units"))
+tsreport(cause, type = "doc", doc_template = "~/tmp/mytemplate.docx", 
+         output_dir = "~/tmp", 
+         args = list(model = "ETS[AAN]", frequency = 12, name = "Units"))
+```
+
+```{r,echo=FALSE}
+plot(cause)
+```
+\clearpage
+
+# References{-}

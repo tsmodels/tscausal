@@ -1,0 +1,16 @@
+Package: tscausal
+Type: Package
+Title: Time Series Causal Inference
+Version: 0.1.0
+Author: a(person("Alexios", "Galanos", role = c("aut", "cre"),
+    email = "alexios@4dscape.com"),
+    person("Steven","Scott",role="cre",
+    email="steve.the.bayesian@gmail.com"))
+Maintainer: alexios galanos <alexios@4dscape.com>
+Description: Time Series based causal inference using any predictive distribution.
+Depends: tsmethods
+Imports: methods, zoo, xts, rmarkdown, bookdown, data.table
+Suggests: knitr, huxtable, flextable
+Encoding: UTF-8
+License: GPL-2
+LazyData: true

@@ -1,0 +1,63 @@
+---
+title: "Time Series Causal Analysis"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`" 
+output: 
+  bookdown::word_document2: 
+    toc: no
+params:
+  dir: NA
+  name: NA
+  frequency: NA
+  model: NA
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(huxtable.bookdown = TRUE)
+options(huxtable.knit_print_df = FALSE)
+```
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+library(xts)
+library(magrittr)
+library(huxtable)
+library(flextable)
+library(tscausal)
+library(rmarkdown)
+x <- readRDS(paste0(params$dir,"/causal_tmp.rds"))
+idate <- x$intervention_date
+horizon <- NROW(x$post_actual)
+```
+
+# Model Report{-}
+
+  * Series    : `r params$name`
+  * Model Used: `r params$model`
+  * Frequency : `r params$frequency`
+  * Intervention Date: `r as.character(idate)`
+  * Significance Level : `r 100*as.numeric(x$alpha)` \%
+  * Hypothesis (H0): Intervention was not significant
+  * Decision : `r ifelse(x$summary_table$p[1] <= x$alpha,"Reject","Fail to Reject")`
+
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,ft.align="left"}
+xx <- tscausal:::.table.print.tscausal(x, digits = 4)
+tab <- as_hux(xx, add_colnames = TRUE) %>% add_rownames(colname = "Statistic", TRUE) %>% theme_grey() %>% map_align(by_cols("left","right","right")) %>% huxtable::set_caption("Table: Causal Analysis") %>% huxtable::set_caption_pos("bottom")
+tab$Statistic[1] <- "Statistic"
+tab
+```
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,results='asis'}
+p <- x$summary$p[1]
+cat("Forecast Distribution tail-area probability p:   ", round(p, 5), "  \n")
+cat("Forecast Distribution prob. of a causal effect:  ", round((1 - p) * 100, ifelse(p < 0.01, 5, ifelse(p < 0.05, 3, 0))), "\\%  \n")
+```
+
+
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+plot(x)
+```
+
+
+
