@@ -1,3 +1,4 @@
+# Code used from CausalImpact
 prettify_percentage <- function(x, round_digits = 0L)
 {
   round.digits <- as.integer(round_digits)

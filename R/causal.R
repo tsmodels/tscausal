@@ -53,7 +53,7 @@ print.tscausal = function(x, digits = 4, ...)
   summary_table <- x$summary_table
   alpha <- x$alpha
   # Print title
-  cat("Posterior inference {tscausal}\n")
+  cat("Predictive inference {tscausal}\n")
   if (is.null(summary_table)) {
     cat("(Inference aborted)\n")
     return(invisible(NULL))
@@ -83,11 +83,12 @@ print.tscausal = function(x, digits = 4, ...)
   cat("\n")
   # Print overall tail-area probability
   p <- summary_table$p[1]
-  cat(paste0("Posterior tail-area probability p:   ", round(p, 5), "\n"))
-  cat(paste0("Posterior prob. of a causal effect:  ", round((1 - p) * 100, ifelse(p < 0.01, 5, ifelse(p < 0.05, 3, 0))), "%\n"))
+  cat(paste0("Predictive Distribution tail-area probability p:   ", round(p, 5), "\n"))
+  cat(paste0("Predictive Distribution prob. of a causal effect:  ", round((1 - p) * 100, ifelse(p < 0.01, 5, ifelse(p < 0.05, 3, 0))), "%\n"))
   cat("\n")
 }
 
+# report statement summary output is based on CausalImpace Code
 tsreport.tscausal = function(object, digits = 4, doc_template = NULL, type = c("screen", "pdf", "doc", "html"), output_dir = "/", args = list(name = "Causal Analysis", frequency = NULL, model = NULL), ...)
 {
   type <- match.arg(type[1], c("screen", "pdf", "doc", "html"))
