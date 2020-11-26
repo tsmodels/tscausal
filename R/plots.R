@@ -1,6 +1,7 @@
-plot.tscausal <- function(x, y = NULL, n_original = 100, ...)
+plot.tscausal <- function(x, y = NULL, n_original = NULL, ...)
 {
   p <- process.tscausal(x, n_original = n_original)
+  if (is.null(n_original)) n_original <- NROW(x$pre_actual)
   par(bg = "white", mar = c(1,2,0.5,3))
   layout(mat = matrix(c(1,2,3), nrow = 3))
   plot(p$prediction, interval_quantiles = c(p$alpha/2, 1 - p$alpha/2), interval_color = "violet", gradient_color = "grey", x_axes = FALSE, 
@@ -48,8 +49,8 @@ process.tscausal <- function(object, n_original = NULL){
       fit_dist <- matrix(as.numeric(fx), ncol = NROW(fx), nrow = NROW(object$predicted), byrow = TRUE)
     }
   } else {
-    if (is.null(n_original)) n_original = NROW(object$pre_actual)
-    fit_dist = matrix(NA, ncol = n_original, nrow = NROW(object$predicted), byrow = TRUE)
+    if (is.null(n_original)) n_original <- NROW(object$pre_actual)
+    fit_dist <- matrix(NA, ncol = n_original, nrow = NROW(object$predicted), byrow = TRUE)
   }
   colnames(fit_dist) <- as.character(tail(index(object$pre_actual), NCOL(fit_dist)))
   response <- rbind(tail(object$pre_actual, NCOL(fit_dist)), object$post_actual)
