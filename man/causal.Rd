@@ -11,7 +11,7 @@ for the counterfactual.
 \usage{
 tscausal(object, \dots)
 \method{tscausal}{tsmodel.distribution}(object, actual, fitted = NULL, 
-alpha = 0.05, \dots)
+alpha = 0.05, include_cumulative = TRUE, \dots)
 }
 \arguments{
 \item{object}{
@@ -28,6 +28,10 @@ an xts vector or an object of class \dQuote{tsmodel.distribution}.
 }
 \item{alpha}{
 The coverage representing the 1-alpha confidence level.
+}
+\item{include_cumulative}{
+Whether to include cumulative sum analysis. This is only valid if the
+target represents a flow variable.
 }
 \item{\ldots}{
 Any additional arguments passed to custom classes.

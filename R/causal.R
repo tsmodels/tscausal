@@ -1,4 +1,4 @@
-tscausal.tsmodel.distribution <- function(object, actual, fitted = NULL, alpha = 0.05, ...) {
+tscausal.tsmodel.distribution <- function(object, actual, fitted = NULL, alpha = 0.05, include_cumulative = TRUE, ...) {
   # Check input
   pindices <- as.Date(colnames(object))
   post_actual <- actual[pindices]
@@ -19,22 +19,39 @@ tscausal.tsmodel.distribution <- function(object, actual, fitted = NULL, alpha =
   prob_lower <- alpha / 2      # e.g., 0.025 when alpha = 0.05
   prob_upper <- 1 - alpha / 2  # e.g., 0.975 when alpha = 0.05
   # Compile summary statistics
-  summary_table <- data.table(type = c("Average", "Cumulative"),
-    actual = c(mean(post_actual), sum(post_actual)),
-    prediction = c(mean(point_pred), sum(point_pred)),
-    prediction_lower = c(quantile(rowMeans(object), prob_lower), quantile(rowSums(object), prob_lower)),
-    prediction_upper = c(quantile(rowMeans(object), prob_upper), quantile(rowSums(object), prob_upper)),
-    prediction_sd = c(sd(rowMeans(object)),sd(rowSums(object))),
-    absolute_effect = c(mean(post_actual) - mean(point_pred), sum(post_actual) - sum(point_pred)),
-    absolute_effect_lower  = c(quantile(rowMeans(y_dist - object), prob_lower), quantile(rowSums(y_dist - object), prob_lower)),
-    absolute_effect_upper = c(quantile(rowMeans(y_dist - object), prob_upper), quantile(rowSums(y_dist - object), prob_upper)),
-    absolute_effect_sd = c(sd(rowMeans(y_dist - object)), sd(rowSums(y_dist - object))))
+  if (include_cumulative) {
+    rep_n <- 2
+    col_names <- c("Average", "Cumulative")
+    summary_table <- data.table(type = col_names,
+                                actual = c(mean(post_actual), sum(post_actual)),
+                                prediction = c(mean(point_pred), sum(point_pred)),
+                                prediction_lower = c(quantile(rowMeans(object), prob_lower), quantile(rowSums(object), prob_lower)),
+                                prediction_upper = c(quantile(rowMeans(object), prob_upper), quantile(rowSums(object), prob_upper)),
+                                prediction_sd = c(sd(rowMeans(object)),sd(rowSums(object))),
+                                absolute_effect = c(mean(post_actual) - mean(point_pred), sum(post_actual) - sum(point_pred)),
+                                absolute_effect_lower  = c(quantile(rowMeans(y_dist - object), prob_lower), quantile(rowSums(y_dist - object), prob_lower)),
+                                absolute_effect_upper = c(quantile(rowMeans(y_dist - object), prob_upper), quantile(rowSums(y_dist - object), prob_upper)),
+                                absolute_effect_sd = c(sd(rowMeans(y_dist - object)), sd(rowSums(y_dist - object))))
+  } else {
+    rep_n <- 1
+    col_names <- "Average"
+    summary_table <- data.table(type = col_names,
+                                actual = mean(post_actual),
+                                prediction = mean(point_pred),
+                                prediction_lower = quantile(rowMeans(object), prob_lower),
+                                prediction_upper = quantile(rowMeans(object), prob_upper),
+                                prediction_sd = sd(rowMeans(object)),
+                                absolute_effect = mean(post_actual) - mean(point_pred),
+                                absolute_effect_lower  = quantile(rowMeans(y_dist - object), prob_lower),
+                                absolute_effect_upper = quantile(rowMeans(y_dist - object), prob_upper),
+                                absolute_effect_sd = sd(rowMeans(y_dist - object)))
+  }
   summary_table[,relative_effect := absolute_effect/prediction]
   summary_table[,relative_effect_lower := absolute_effect_lower/prediction]
   summary_table[,relative_effect_upper := absolute_effect_upper/prediction]
   summary_table[,relative_effect_sd := absolute_effect_sd/prediction]
   # Add interval coverage, defined by alpha
-  summary_table[,alpha := rep(alpha,2)]
+  summary_table[,alpha := rep(alpha,rep_n)]
   # Add one-sided tail-area probability of overall impact, p
   y_samples_post_sum <- rowSums(object)
   y_post_sum <- sum(post_actual)
@@ -43,7 +60,7 @@ tscausal.tsmodel.distribution <- function(object, actual, fitted = NULL, alpha =
   if (p > 1 | p < 0) stop("\ntscausal-->error: estimated probability outside admissible range [0,1]...check.")
   summary_table[,p :=  p]
   out = list(summary_table = summary_table, predicted = object, post_actual = post_actual, pre_actual = pre_actual,
-             fitted = fitted, intervention_date = intervention_date, alpha = alpha)
+             fitted = fitted, intervention_date = intervention_date, alpha = alpha, include_cumulative = include_cumulative)
   class(out) = "tscausal"
   return(out)
 }
@@ -59,25 +76,34 @@ print.tscausal = function(x, digits = 4, ...)
     return(invisible(NULL))
   }
   # Compile data frame with formatted numbers
+  if (x$include_cumulative) {
+    sep <- c("", "")
+  } else {
+    sep <- ""
+  }
   f_summary <- data.table(
     actual = format_number(summary_table$actual, digits = digits),
     prediction = paste0(format_number(summary_table$prediction, digits = digits), " (", format_number(summary_table$prediction_sd, digits = digits), ")"),
     prediction_ci = format_confidence_intervals(summary_table$prediction_lower, summary_table$prediction_upper, digits = digits),
-    Separator1 = c("", ""),
+    Separator1 = sep,
     absolute_effect = paste0(format_number(summary_table$absolute_effect, digits = digits)," (", format_number(summary_table$absolute_effect_sd, digits = digits), ")"),
     absolute_effect_ci = format_confidence_intervals(summary_table$absolute_effect_lower, summary_table$absolute_effect_upper, digits = digits),
-    Separator2 = c("", ""),
+    Separator2 = sep,
     relative_effect = paste0(format_percent(summary_table$relative_effect, digits = digits), " (", format_percent(summary_table$relative_effect_sd, digits = digits), ")"),
     relative_effect_ci = format_percent_confidence_intervals(summary_table$relative_effect_lower, summary_table$relative_effect_upper, digits = digits))
   # Invert and format as table
   f_summary <- t(f_summary)
-  colnames(f_summary) <- c("Average", "Cumulative")
+  if (x$include_cumulative) {
+    colnames(f_summary) <- c("Average","Cumulative")
+  } else {
+    colnames(f_summary) <- "Average"
+  }
   ci_label <- paste0(round((1 - alpha) * 100), "% CI")
   row.names(f_summary) <- c("Actual", "Prediction (s.d.)", ci_label,
-                           " ",
-                           "Absolute effect (s.d.)", paste(ci_label, ""),
-                           "  ",
-                           "Relative effect (s.d.)", paste(ci_label, " "))
+                            " ",
+                            "Absolute effect (s.d.)", paste(ci_label, ""),
+                            "  ",
+                            "Relative effect (s.d.)", paste(ci_label, " "))
   cat("\n")
   print.default(f_summary, print.gap = 3L, quote = FALSE)
   cat("\n")
@@ -128,16 +154,18 @@ tsreport.tscausal = function(object, digits = 4, doc_template = NULL, type = c("
                    ci_coverage, " interval of [", absolute_effect_lower[1], ", ",
                    absolute_effect_upper[1], "]. For a discussion of ",
                    "the significance of this effect, see below.")
+    if (object$include_cumulative) {
     # Summarize sums
-    stmt <- paste0(stmt, "\n\nSumming up the individual data points during ",
-                   "the post-intervention period (which can only sometimes be ",
-                   "meaningfully interpreted), the response variable had an ",
-                   "overall value of ", actual[2], ". ",
-                   if (sig) "By contrast, had " else "Had ",
-                   "the intervention not taken place, we would have expected ",
-                   "a sum of ", prediction[2], ". The ", ci_coverage, " interval of ",
-                   "this prediction is [", prediction_lower[2], ", ", prediction_upper[2],
-                   "].")
+      stmt <- paste0(stmt, "\n\nSumming up the individual data points during ",
+                     "the post-intervention period (which can only sometimes be ",
+                     "meaningfully interpreted), the response variable had an ",
+                     "overall value of ", actual[2], ". ",
+                     if (sig) "By contrast, had " else "Had ",
+                     "the intervention not taken place, we would have expected ",
+                     "a sum of ", prediction[2], ". The ", ci_coverage, " interval of ",
+                     "this prediction is [", prediction_lower[2], ", ", prediction_upper[2],
+                     "].")
+    }
     # Summarize relative numbers (in which case row [1] = row [2])
     stmt <- paste0(stmt, "\n\nThe above results are given in terms of ",
                    "absolute numbers. In relative terms, the response variable ",
@@ -213,11 +241,11 @@ tsreport.tscausal = function(object, digits = 4, doc_template = NULL, type = c("
     if (is.null(fname)) fname <- paste0(fname,"_tscausal_report_",format(as.Date(Sys.Date()),"%Y%m%d")) else fname = paste0("tscausal_report_",format(as.Date(Sys.Date()),"%Y%m%d"))
     if (type == "pdf") {
       suppressWarnings(rmarkdown::render(file.path(find.package('tscausal'),'scripts/causal_report_pdf.Rmd'),
-                              output_dir = output_dir,
-                              output_file = paste0(fname,".pdf"),
-                              intermediates_dir = tempdir(),
-                              output_format = pdf_document2(toc = FALSE),
-                              params = list(dir = as.character(output_dir), name = args$name, frequency = args$frequency, model = args$model), quiet = TRUE))
+                                         output_dir = output_dir,
+                                         output_file = paste0(fname,".pdf"),
+                                         intermediates_dir = tempdir(),
+                                         output_format = pdf_document2(toc = FALSE),
+                                         params = list(dir = as.character(output_dir), name = args$name, frequency = args$frequency, model = args$model), quiet = TRUE))
     } else if (type == "doc") {
       file.copy(file.path(find.package('tscausal'),'scripts/causal_report_docx.Rmd'), file.path(paste0(output_dir,"/causal_report_docx.Rmd")))
       suppressWarnings(rmarkdown::render(file.path(paste0(output_dir,"/causal_report_docx.Rmd")),
@@ -275,15 +303,17 @@ tsreport.tscausal = function(object, digits = 4, doc_template = NULL, type = c("
               absolute_effect_upper[1], "]. For a discussion of ",
               "the significance of this effect, see below.")
   # Summarize sums
-  stmt <- cat(stmt, "  \n Summing up the individual data points during ",
-              "the post-intervention period (which can only sometimes be ",
-              "meaningfully interpreted), the response variable had an ",
-              "overall value of ", actual[2], ". ",
-              if (sig) "By contrast, had " else "Had ",
-              "the intervention not taken place, we would have expected ",
-              "a sum of ", prediction[2], ". The ", ci_coverage, " interval of ",
-              "this prediction is [", prediction_lower[2], ", ", prediction_upper[2],
-              "].")
+  if (x$include_cumulative) {
+    stmt <- cat(stmt, "  \n Summing up the individual data points during ",
+                "the post-intervention period (which can only sometimes be ",
+                "meaningfully interpreted), the response variable had an ",
+                "overall value of ", actual[2], ". ",
+                if (sig) "By contrast, had " else "Had ",
+                "the intervention not taken place, we would have expected ",
+                "a sum of ", prediction[2], ". The ", ci_coverage, " interval of ",
+                "this prediction is [", prediction_lower[2], ", ", prediction_upper[2],
+                "].")
+  }
   # Summarize relative numbers (in which case row [1] = row [2])
   stmt <- cat(stmt,"  \n The above results are given in terms of ",
               "absolute numbers. In relative terms, the response variable ",
@@ -374,7 +404,11 @@ tsreport.tscausal = function(object, digits = 4, doc_template = NULL, type = c("
     relative_effect_ci = format_percent_confidence_intervals(summary_table$relative_effect_lower, summary_table$relative_effect_upper, digits = digits))
   # Invert and format as table
   f_summary <- t(f_summary)
-  colnames(f_summary) <- c("Average", "Cumulative")
+  if (x$include_cumulative) {
+    colnames(f_summary) <- c("Average", "Cumulative")
+  } else {
+    colnames(f_summary) <- "Average"
+  }
   ci_label <- paste0(round((1 - alpha) * 100), "% CI")
   row.names(f_summary) <- c("Actual", "Prediction (s.d.)", ci_label,
                             " ",
@@ -383,4 +417,3 @@ tsreport.tscausal = function(object, digits = 4, doc_template = NULL, type = c("
                             "Relative effect (s.d.)", paste(ci_label, " "))
   return(f_summary)
 }
-

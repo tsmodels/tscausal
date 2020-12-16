@@ -1,7 +1,7 @@
 Package: tscausal
 Type: Package
 Title: Time Series Causal Inference
-Version: 0.1.0
+Version: 0.2.0
 Author: a(person("Alexios", "Galanos", role = c("aut", "cre"),
     email = "alexios@4dscape.com"),
     person("Steven","Scott",role="aut",

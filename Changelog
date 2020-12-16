@@ -1,0 +1,3 @@
+# 2020-12-16 v0.2.0 [AG]
+- Added option to include or exclude cumulative analysis since this only makes sense for flow variables.
+- Added extra plotting options to pass to the distribution plots
