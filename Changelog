@@ -1,3 +1,8 @@
+# 2020-12-29 v0.3.0 [AG]
+- License changed to APACHE to be compliant with use of code from CausalImpact.
+- Reporting code moved to separate file and function and copyright notice addded
+to that file to conform to requirements for using the CausalImpact reporting code.
+
 # 2020-12-16 v0.2.0 [AG]
 - Added option to include or exclude cumulative analysis since this only makes sense for flow variables.
 - Added extra plotting options to pass to the distribution plots
